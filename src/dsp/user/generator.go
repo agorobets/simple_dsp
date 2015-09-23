@@ -7,30 +7,25 @@ import (
 )
 
 const (
-	MAX_USER_PROFILE_COUNTER = 27
+	MAX_USER_PROFILE_COUNTER = 26
 	MAX_ATTRIBUTE_VALUE      = 200
 )
 
-var userCounter = 0
-var userProfileCounter = 0
-var mutex sync.Mutex
+var userGlobalCounter = 0
+var userProfileGlobalCounter = 0
+var counterMutex sync.Mutex
 
 // Generates user with filled attributes
 func Generate() *User {
-	mutex.Lock()
-
-	incrementCounters()
-	user := &User{
+	userCounter, userProfileCounter := incrementCounters()
+	return &User{
 		ID:      "u" + strconv.Itoa(userCounter),
-		Profile: generateProfile(),
+		Profile: generateProfile(userProfileCounter),
 	}
-
-	mutex.Unlock()
-	return user
 }
 
 // Generates user profile with userProfileCounter attributes
-func generateProfile() map[string]string {
+func generateProfile(userProfileCounter int) map[string]string {
 	profile := make(map[string]string, userProfileCounter)
 	for i := 0; i < userProfileCounter; i++ {
 		character := string(i + 'A')
@@ -40,11 +35,16 @@ func generateProfile() map[string]string {
 }
 
 // Increments user counters on every Generate() call
-func incrementCounters() {
-	userCounter++
-	userProfileCounter++
+func incrementCounters() (int, int) {
+	counterMutex.Lock()
+	defer counterMutex.Unlock()
 
-	if userProfileCounter >= MAX_USER_PROFILE_COUNTER {
-		userProfileCounter = 1
+	userGlobalCounter++
+	userProfileGlobalCounter++
+
+	if userProfileGlobalCounter > MAX_USER_PROFILE_COUNTER {
+		userProfileGlobalCounter = 1
 	}
+
+	return userGlobalCounter, userProfileGlobalCounter
 }
