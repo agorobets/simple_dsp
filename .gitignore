@@ -22,3 +22,10 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+
+# go files
+bin
+pkg
+src/*
+!src/dsp/
