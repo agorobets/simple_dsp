@@ -38,8 +38,8 @@ func generateTargetList(maxTargetsNumber, maxAttributesNumber int) []Target {
 	for i := 0; i < targetsNumber; i++ {
 		character := string(i + 'A')
 		targets[i] = Target{
-			Attribute: "attr_" + character,
-			Values:    generateAttributes(character, maxAttributesNumber),
+			Name:   "attr_" + character,
+			Values: generateAttributes(character, maxAttributesNumber),
 		}
 	}
 

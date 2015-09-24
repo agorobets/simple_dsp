@@ -1,8 +1,8 @@
 package campaign
 
 type Target struct {
-	Attribute string   `json:"target"`
-	Values    []string `json:"attr_list"`
+	Name   string   `json:"target"`
+	Values []string `json:"attr_list"`
 }
 
 type Campaign struct {

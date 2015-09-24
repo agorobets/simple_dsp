@@ -8,23 +8,21 @@ import (
 
 type dataStruct struct {
 	sync.RWMutex
-	campaigns       map[string]*campaign.Campaign
-	targetLeaves    map[string][]string
-	attributeLeaves map[string]map[string]bool
+	campaigns    map[string]*campaign.Campaign
+	targetLeaves map[string][]string
 }
 
 // Creates new dataStruct with initialized fields
 func newData() *dataStruct {
 	return &dataStruct{
-		campaigns:       make(map[string]*campaign.Campaign),
-		targetLeaves:    make(map[string][]string),
-		attributeLeaves: make(map[string]map[string]bool),
+		campaigns:    make(map[string]*campaign.Campaign),
+		targetLeaves: make(map[string][]string),
 	}
 }
 
 // Adds campaign
 // If campaign already added or not valid, will return error
-func (d *dataStruct) addCampaign(c *campaign.Campaign) error {
+func (d *dataStruct) AddCampaign(c *campaign.Campaign) error {
 	d.Lock()
 	defer d.Unlock()
 
@@ -37,46 +35,53 @@ func (d *dataStruct) addCampaign(c *campaign.Campaign) error {
 	}
 
 	d.campaigns[c.Name] = c
-	return nil
-}
 
-func (d *dataStruct) addTargetLeaves(c *campaign.Campaign) error {
-	d.Lock()
-	defer d.Unlock()
-
-	if _, ok := d.campaigns[c.Name]; !ok {
-		return fmt.Errorf("Campaign '%s' doesn't exist", c.Name)
-	}
-
-	targetLeaves := make([]string, len(c.TargetList))
-	createTargetLeaves(c, targetLeaves)
-
-	for _, leave := range targetLeaves {
-
+	if err := d.addTargetLeaf(c); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (d *dataStruct) addAttributeLeaves(c *campaign.Campaign) error {
-	d.Lock()
-	defer d.Unlock()
+// Adds leaf to targetLeaves map, where keys is concatenated string of campaign target names
+// and value is array of campaign ids
+func (d *dataStruct) addTargetLeaf(c *campaign.Campaign) error {
+	var leaf string
+	for _, t := range c.TargetList {
+		leaf = leaf + t.Name
+	}
 
-	if _, ok := d.campaigns[c.Name]; !ok {
-		return fmt.Errorf("Campaign '%s' doesn't exist", c.Name)
+	if _, ok := d.targetLeaves[leaf]; !ok {
+		d.targetLeaves[leaf] = []string{c.Name}
+	} else {
+		d.targetLeaves[leaf] = append(d.targetLeaves[leaf], c.Name)
 	}
 
 	return nil
+}
+
+// Returns array of campaigns, which all targeting also have in user profile
+func (d *dataStruct) getCampaignsByUserProfile(profile map[string]string) []string {
+	var targetLeaf string
+
+	validCampaigns := make(map[string]string)
+	for target, attribute := range profile {
+		targetLeaf = targetLeaf + target
+
+		if campaigns, ok := d.targetLeaves[targetLeaf]; ok {
+			validCampaigns[targetLeaf] = append(validCampaigns[targetLeaf], d.targetLeaves[targetLeaf]...)
+		}
+	}
+	return validCampaigns
 }
 
 // Reloads data attributes with newData struct
-func (d *dataStruct) reload(newData *dataStruct) {
+func (d *dataStruct) Reload(newData *dataStruct) {
 	d.Lock()
 	defer d.Unlock()
 
 	d.campaigns = newData.campaigns
 	d.targetLeaves = newData.targetLeaves
-	d.attributeLeaves = newData.attributeLeaves
 }
 
 // Validates campaign attributes
@@ -103,10 +108,4 @@ func validateCampaign(c *campaign.Campaign) error {
 	}
 
 	return nil
-}
-
-func createTargetLeaves(c *campaign.Campaign, leaves []string) {
-	leaves := make([]string, len(c.TargetList))
-
-	return leaves
 }

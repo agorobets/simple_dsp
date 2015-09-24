@@ -94,12 +94,40 @@ func ImportCampaigns(ctx *gin.Context) {
 	ctx.String(200, "")
 }
 
+// Returns won campaign by user profile and campaign max price
+// Json array of campaigns should be send in request body (POST)
+// Responses:
+//    200 OK - return winner struct as Json object
+//    400 Bad Request - return error string
 func Search(ctx *gin.Context) {
-	ctx.String(200, "search")
+	u := &user.User{}
+
+	if ctx.BindJSON(u) != nil {
+		ctx.String(http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	winner, err := bidding.ProcessBid(u)
+	if err != nil {
+		ctx.String(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	ctx.JSON(200, winner)
 }
 
+// Generates user and tries to find campaign by user profile and max price
+// Responses:
+//    200 OK - return winner struct as Json object
+//    400 Bad Request - return error string
 func SearchAuto(ctx *gin.Context) {
-	ctx.String(200, "search_auto")
+	winner, err := bidding.SearchWinner(user.Generate())
+	if err != nil {
+		ctx.String(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	ctx.JSON(200, winner)
 }
 
 // Validates arguments of GetCampaigns handler
