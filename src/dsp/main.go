@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"runtime"
 	"strconv"
 )
 
@@ -17,6 +18,8 @@ const (
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	router := gin.Default()
 
 	router.GET("/campaign", GetCampaigns)
@@ -70,6 +73,11 @@ func GetUser(ctx *gin.Context) {
 	ctx.JSON(200, user.Generate())
 }
 
+// Imports campaigns and updates bidding.data struct
+// Json array of campaigns should be send in request body (POST)
+// Responses:
+//    200 OK - return nothing
+//    400 Bad Request - return error string
 func ImportCampaigns(ctx *gin.Context) {
 	campaigns := make([]campaign.Campaign, 0)
 
