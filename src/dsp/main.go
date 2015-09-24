@@ -18,6 +18,7 @@ const (
 )
 
 func main() {
+	gin.SetMode(gin.ReleaseMode)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	router := gin.Default()
