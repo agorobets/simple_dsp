@@ -8,7 +8,7 @@ import (
 
 const (
 	MAX_USER_PROFILE_COUNTER = 26
-	MAX_ATTRIBUTE_VALUE      = 200
+	MAX_ATTRIBUTE_VALUE      = 100
 )
 
 var userGlobalCounter = 0

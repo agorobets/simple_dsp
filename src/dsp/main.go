@@ -27,6 +27,7 @@ func main() {
 	router.POST("/import_camp", ImportCampaigns)
 	router.POST("/search", Search)
 	router.GET("/search_auto", SearchAuto)
+	router.GET("/dump", DumpData)
 
 	router.Run(":3000")
 }
@@ -106,14 +107,7 @@ func Search(ctx *gin.Context) {
 		ctx.String(http.StatusBadRequest, "Bad Request")
 		return
 	}
-
-	winner, err := bidding.ProcessBid(u)
-	if err != nil {
-		ctx.String(http.StatusBadRequest, err.Error())
-		return
-	}
-
-	ctx.JSON(200, winner)
+	ctx.JSON(200, bidding.ProcessBid(u))
 }
 
 // Generates user and tries to find campaign by user profile and max price
@@ -121,13 +115,14 @@ func Search(ctx *gin.Context) {
 //    200 OK - return winner struct as Json object
 //    400 Bad Request - return error string
 func SearchAuto(ctx *gin.Context) {
-	winner, err := bidding.SearchWinner(user.Generate())
-	if err != nil {
-		ctx.String(http.StatusBadRequest, err.Error())
-		return
-	}
+	ctx.JSON(200, bidding.ProcessBid(user.Generate()))
+}
 
-	ctx.JSON(200, winner)
+// Returns dump of bidding.data object as JSON
+// Responses:
+//    200 OK
+func DumpData(ctx *gin.Context) {
+	ctx.JSON(200, bidding.GetData())
 }
 
 // Validates arguments of GetCampaigns handler

@@ -32,8 +32,8 @@ func generate(id, maxTargetsNumber, maxAttributesNumber int) *Campaign {
 
 // Generates list of campaign targets
 func generateTargetList(maxTargetsNumber, maxAttributesNumber int) []Target {
-	targetsNumber := rand.Intn(maxTargetsNumber)
-	targets := make([]Target, targetsNumber+1)
+	targetsNumber := rand.Intn(maxTargetsNumber-1) + 1
+	targets := make([]Target, targetsNumber)
 
 	for i := 0; i < targetsNumber; i++ {
 		character := string(i + 'A')
@@ -48,7 +48,7 @@ func generateTargetList(maxTargetsNumber, maxAttributesNumber int) []Target {
 
 // Generates list of available attributes for campaign target
 func generateAttributes(prefix string, maxAttributesNumber int) []string {
-	attributesNumber := rand.Intn(maxAttributesNumber)
+	attributesNumber := rand.Intn(maxAttributesNumber-1) + 1
 	attributes := make([]string, attributesNumber)
 	for i := 0; i < attributesNumber; i++ {
 		attributes[i] = prefix + strconv.Itoa(i)
