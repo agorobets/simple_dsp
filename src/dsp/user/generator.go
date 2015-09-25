@@ -8,22 +8,48 @@ import (
 )
 
 const (
-	MAX_USER_PROFILE_COUNTER = 26
-	MAX_ATTRIBUTE_VALUE      = 200
+	MAX_USER_PROFILE_COUNTER   = 26
+	MAX_ATTRIBUTE_VALUE        = 200
+	RANDOM_GENERATOR_CHAN_SIZE = 2
+	USER_GENERATOR_CHAN_SIZE   = 2
 )
 
 var userGlobalCounter uint64
 var userProfileGlobalCounter uint64
 
-var rnd *rand.Rand
+var rndChan chan int
 
-func init() {
-	source := rand.NewSource(time.Now().UnixNano())
-	rnd = rand.New(source)
+// Initialize user generator
+func InitGenerator() chan *User {
+	initRandomGenerator()
+
+	userChan := make(chan *User, USER_GENERATOR_CHAN_SIZE)
+	for i := 0; i < USER_GENERATOR_CHAN_SIZE; i++ {
+		go func() {
+			for {
+				userChan <- generate()
+			}
+		}()
+	}
+	return userChan
+}
+
+// Creates goroutine with random generator
+func initRandomGenerator() {
+	rndChan = make(chan int, RANDOM_GENERATOR_CHAN_SIZE*USER_GENERATOR_CHAN_SIZE)
+	for i := 0; i < RANDOM_GENERATOR_CHAN_SIZE*USER_GENERATOR_CHAN_SIZE; i++ {
+		go func() {
+			source := rand.NewSource(time.Now().UnixNano())
+			rnd := rand.New(source)
+			for {
+				rndChan <- rnd.Intn(MAX_ATTRIBUTE_VALUE-1) + 1
+			}
+		}()
+	}
 }
 
 // Generates user with filled attributes
-func Generate() *User {
+func generate() *User {
 	return &User{
 		ID:      "u" + strconv.Itoa(int(atomic.AddUint64(&userGlobalCounter, 1))),
 		Profile: generateProfile(),
@@ -41,7 +67,7 @@ func generateProfile() map[string]string {
 	profile := make(map[string]string, userProfileCounter)
 	for i := 0; i < userProfileCounter; i++ {
 		character := string(i + 'A')
-		profile["attr_"+character] = character + strconv.Itoa(int(rnd.Float32()*MAX_ATTRIBUTE_VALUE)+1)
+		profile["attr_"+character] = character + strconv.Itoa(<-rndChan)
 	}
 	return profile
 }

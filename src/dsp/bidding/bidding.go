@@ -42,12 +42,9 @@ func ProcessBid(u *user.User) Winner {
 		Counter:      atomic.AddUint64(&counter, 1),
 	}
 
-	validCampaigns := data.GetCampaignsByUserProfile(u.Profile)
-	if len(validCampaigns) > 0 {
-		targetedCampaigns := data.GetTargetedCampaigns(validCampaigns, u.Profile)
-		if len(targetedCampaigns) > 0 {
-			winner.CampaignName = runAuction(targetedCampaigns)
-		}
+	targetedCampaigns := data.GetTargetedCampaigns(u.Profile)
+	if len(targetedCampaigns) > 0 {
+		winner.CampaignName = runAuction(targetedCampaigns)
 	}
 
 	return winner
@@ -62,16 +59,16 @@ func GetData() *dataStruct {
 }
 
 // Determines the winner of auction by max price and returns its name
-func runAuction(campaigns map[string]float64) string {
+func runAuction(campaigns []*campaign.Campaign) string {
 	var maxBid float64
 	var maxBidders []string
 
-	for name, price := range campaigns {
-		if maxBid < price {
-			maxBidders = []string{name}
-			maxBid = price
-		} else if maxBid == price {
-			maxBidders = append(maxBidders, name)
+	for _, campaign := range campaigns {
+		if maxBid < campaign.Price {
+			maxBidders = []string{campaign.Name}
+			maxBid = campaign.Price
+		} else if maxBid == campaign.Price {
+			maxBidders = append(maxBidders, campaign.Name)
 		}
 	}
 

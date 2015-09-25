@@ -8,15 +8,15 @@ import (
 
 type dataStruct struct {
 	sync.RWMutex
-	Campaigns    map[string]*campaign.Campaign `json:"campaigns"`
-	TargetLeaves map[string][]string           `json:"leaves"`
+	Campaigns    map[string]*campaign.Campaign   `json:"campaigns"`
+	TargetLeaves map[string][]*campaign.Campaign `json:"leaves"`
 }
 
 // Creates new dataStruct with initialized fields
 func newData() *dataStruct {
 	return &dataStruct{
 		Campaigns:    make(map[string]*campaign.Campaign),
-		TargetLeaves: make(map[string][]string),
+		TargetLeaves: make(map[string][]*campaign.Campaign),
 	}
 }
 
@@ -46,51 +46,23 @@ func (d *dataStruct) Reload(newData *dataStruct) {
 }
 
 // Returns array of campaigns, which all targeting also have in user profile
-func (d *dataStruct) GetCampaignsByUserProfile(profile map[string]string) []string {
+func (d *dataStruct) GetTargetedCampaigns(profile map[string]string) []*campaign.Campaign {
 	d.RLock()
 	defer d.RUnlock()
 
 	var targetLeaf string
 
-	validCampaigns := []string{}
+	targetedCampaigns := []*campaign.Campaign{}
 	for target, _ := range profile {
 		targetLeaf = targetLeaf + target
 		if campaigns, ok := d.TargetLeaves[targetLeaf]; ok {
-			validCampaigns = append(validCampaigns, campaigns...)
-		}
-	}
-	return validCampaigns
-}
-
-// Returns campaigns, which all target attributes matched  with user profile attributes:
-// {'campaign_name': price, ...}
-func (d *dataStruct) GetTargetedCampaigns(campaignNames []string, profile map[string]string) map[string]float64 {
-	d.RLock()
-	defer d.RUnlock()
-
-	targetedCampaigns := make(map[string]float64)
-	for _, cName := range campaignNames {
-		matchesCount := 0
-		for _, target := range d.Campaigns[cName].TargetList {
-			matched := false
-			for _, attribute := range target.Values {
-				if attribute == profile[target.Name] {
-					matched = true
-					break
+			for _, campaign := range campaigns {
+				if IsTargetedCampaign(campaign, profile) {
+					targetedCampaigns = append(targetedCampaigns, campaign)
 				}
 			}
-			if !matched {
-				break
-			}
-			matchesCount++
-		}
-
-		// if all campaign target attributes matched, then add it
-		if matchesCount == len(d.Campaigns[cName].TargetList) {
-			targetedCampaigns[cName] = d.Campaigns[cName].Price
 		}
 	}
-
 	return targetedCampaigns
 }
 
@@ -103,10 +75,29 @@ func (d *dataStruct) addTargetLeaf(c *campaign.Campaign) error {
 	}
 
 	if _, ok := d.TargetLeaves[leaf]; !ok {
-		d.TargetLeaves[leaf] = []string{c.Name}
+		d.TargetLeaves[leaf] = []*campaign.Campaign{c}
 	} else {
-		d.TargetLeaves[leaf] = append(d.TargetLeaves[leaf], c.Name)
+		d.TargetLeaves[leaf] = append(d.TargetLeaves[leaf], c)
 	}
 
 	return nil
+}
+
+// Returns campaigns, which all target attributes matched  with user profile attributes:
+// {'campaign_name': price, ...}
+func IsTargetedCampaign(campaign *campaign.Campaign, profile map[string]string) bool {
+	for _, target := range campaign.TargetList {
+		matched := false
+		for _, attribute := range target.Values {
+			if attribute == profile[target.Name] {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	return true
 }
