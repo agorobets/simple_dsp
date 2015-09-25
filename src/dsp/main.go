@@ -5,8 +5,9 @@ import (
 	"dsp/campaign"
 	"dsp/user"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"net/http"
+	// _ "net/http/pprof"
+	"encoding/json"
 	"runtime"
 	"strconv"
 )
@@ -18,19 +19,16 @@ const (
 )
 
 func main() {
-	gin.SetMode(gin.ReleaseMode)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	router := gin.Default()
+	http.HandleFunc("/campaign", GetCampaigns)
+	http.HandleFunc("/user", GetUser)
+	http.HandleFunc("/import_camp", ImportCampaigns)
+	http.HandleFunc("/search", Search)
+	http.HandleFunc("/search_auto", SearchAuto)
+	http.HandleFunc("/dump", DumpData)
 
-	router.GET("/campaign", GetCampaigns)
-	router.GET("/user", GetUser)
-	router.POST("/import_camp", ImportCampaigns)
-	router.POST("/search", Search)
-	router.GET("/search_auto", SearchAuto)
-	router.GET("/dump", DumpData)
-
-	router.Run(":3000")
+	http.ListenAndServe(":3000", nil)
 }
 
 // Handler generates JSON array of campaigns
@@ -41,38 +39,47 @@ func main() {
 // Responses:
 //   200 OK - return JSON array of campaigns
 //   400 Bad Request
-func GetCampaigns(ctx *gin.Context) {
-	maxAttributesNumber, err := strconv.Atoi(ctx.DefaultQuery("x", strconv.Itoa(MAX_NUMBER_OF_ATTRIBUTES)))
-	if err != nil {
-		ctx.String(http.StatusBadRequest, "Argument 'x' must be a number")
+func GetCampaigns(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "GET" {
+		sendString(w, http.StatusNotFound, "Not Found")
 		return
 	}
 
-	maxTargetsNumber, err := strconv.Atoi(ctx.DefaultQuery("y", strconv.Itoa(MAX_NUMBER_OF_TARGETS)))
+	maxAttributesNumber, err := getReqIntArg(req, "x", MAX_NUMBER_OF_ATTRIBUTES)
 	if err != nil {
-		ctx.String(http.StatusBadRequest, "Argument 'y' must be a number")
+		sendString(w, http.StatusBadRequest, "Argument 'x' must be a number")
 		return
 	}
 
-	campaignsNumber, err := strconv.Atoi(ctx.DefaultQuery("z", strconv.Itoa(MAX_NUMBER_OF_CAMPAIGNS)))
+	maxTargetsNumber, err := getReqIntArg(req, "y", MAX_NUMBER_OF_TARGETS)
 	if err != nil {
-		ctx.String(http.StatusBadRequest, "Argument 'z' must be a number")
+		sendString(w, http.StatusBadRequest, "Argument 'y' must be a number")
+		return
+	}
+
+	campaignsNumber, err := getReqIntArg(req, "z", MAX_NUMBER_OF_CAMPAIGNS)
+	if err != nil {
+		sendString(w, http.StatusBadRequest, "Argument 'z' must be a number")
 		return
 	}
 
 	if err := validateCampaignArguments(campaignsNumber, maxTargetsNumber, maxAttributesNumber); err != nil {
-		ctx.String(http.StatusBadRequest, err.Error())
+		sendString(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	ctx.JSON(200, campaign.GenerateMany(campaignsNumber, maxTargetsNumber, maxAttributesNumber))
+	sendJson(w, http.StatusOK, campaign.GenerateMany(campaignsNumber, maxTargetsNumber, maxAttributesNumber))
 }
 
 // Generates randomly filled User JSON object
 // Responses:
 //   200 OK - return JSON object of user
-func GetUser(ctx *gin.Context) {
-	ctx.JSON(200, user.Generate())
+func GetUser(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "GET" {
+		sendString(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	sendJson(w, http.StatusOK, user.Generate())
 }
 
 // Imports campaigns and updates bidding.data struct
@@ -80,20 +87,25 @@ func GetUser(ctx *gin.Context) {
 // Responses:
 //    200 OK - return nothing
 //    400 Bad Request - return error string
-func ImportCampaigns(ctx *gin.Context) {
-	campaigns := make([]campaign.Campaign, 0)
+func ImportCampaigns(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "POST" {
+		sendString(w, http.StatusNotFound, "Not Found")
+		return
+	}
 
-	if ctx.BindJSON(&campaigns) != nil {
-		ctx.String(http.StatusBadRequest, "Bad Request")
+	campaigns := make([]campaign.Campaign, 0)
+	decoder := json.NewDecoder(req.Body)
+	if decoder.Decode(&campaigns) != nil {
+		sendString(w, http.StatusBadRequest, "Bad Request")
 		return
 	}
 
 	if err := bidding.ReloadData(campaigns); err != nil {
-		ctx.String(http.StatusBadRequest, err.Error())
+		sendString(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	ctx.String(200, "")
+	sendString(w, http.StatusOK, "")
 }
 
 // Returns won campaign by user profile and campaign max price
@@ -101,29 +113,43 @@ func ImportCampaigns(ctx *gin.Context) {
 // Responses:
 //    200 OK - return winner struct as Json object
 //    400 Bad Request - return error string
-func Search(ctx *gin.Context) {
-	u := &user.User{}
-
-	if ctx.BindJSON(u) != nil {
-		ctx.String(http.StatusBadRequest, "Bad Request")
+func Search(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "POST" {
+		sendString(w, http.StatusNotFound, "Not Found")
 		return
 	}
-	ctx.JSON(200, bidding.ProcessBid(u))
+
+	u := &user.User{}
+	decoder := json.NewDecoder(req.Body)
+	if decoder.Decode(u) != nil {
+		sendString(w, http.StatusBadRequest, "Bad Request")
+		return
+	}
+
+	sendJson(w, http.StatusOK, bidding.ProcessBid(u))
 }
 
 // Generates user and tries to find campaign by user profile and max price
 // Responses:
 //    200 OK - return winner struct as Json object
 //    400 Bad Request - return error string
-func SearchAuto(ctx *gin.Context) {
-	ctx.JSON(200, bidding.ProcessBid(user.Generate()))
+func SearchAuto(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "GET" {
+		sendString(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	sendJson(w, http.StatusOK, bidding.ProcessBid(user.Generate()))
 }
 
 // Returns dump of bidding.data object as JSON
 // Responses:
 //    200 OK
-func DumpData(ctx *gin.Context) {
-	ctx.JSON(200, bidding.GetData())
+func DumpData(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "GET" {
+		sendString(w, http.StatusNotFound, "Not Found")
+		return
+	}
+	sendJson(w, http.StatusOK, bidding.GetData())
 }
 
 // Validates arguments of GetCampaigns handler
@@ -141,4 +167,32 @@ func validateCampaignArguments(campaignsNumber, maxTargetsNumber, maxAttributesN
 	}
 
 	return nil
+}
+
+// sends json to client
+func sendJson(w http.ResponseWriter, code int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+
+	encoder := json.NewEncoder(w)
+	if err := encoder.Encode(data); err != nil {
+		panic(err)
+	}
+}
+
+// sends string to client
+func sendString(w http.ResponseWriter, code int, str string) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(code)
+	fmt.Fprint(w, str)
+}
+
+// returns int argument from request query
+func getReqIntArg(req *http.Request, name string, defaultVal int) (int, error) {
+	val := req.URL.Query().Get(name)
+	if val == "" {
+		return defaultVal, nil
+	} else {
+		return strconv.Atoi(val)
+	}
 }

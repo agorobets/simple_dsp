@@ -5,20 +5,17 @@ import (
 	"dsp/user"
 	"fmt"
 	"math/rand"
-	"sync"
+	"sync/atomic"
 )
 
 type Winner struct {
 	CampaignName string `json:"winner"`
-	Counter      int    `json:"counter"`
+	Counter      uint64 `json:"counter"`
 }
 
 var data = newData()
 
-var counter struct {
-	sync.Mutex
-	n int
-}
+var counter uint64
 
 // Creates new data struct and fill it with campaigns
 // when new data created, current data will be replaced with new
@@ -39,10 +36,10 @@ func ReloadData(campaigns []campaign.Campaign) error {
 }
 
 // Searches targeted campaigns, and determines winner by user
-func ProcessBid(u *user.User) *Winner {
-	winner := &Winner{
+func ProcessBid(u *user.User) Winner {
+	winner := Winner{
 		CampaignName: "none",
-		Counter:      incrementCounter(),
+		Counter:      atomic.AddUint64(&counter, 1),
 	}
 
 	validCampaigns := data.GetCampaignsByUserProfile(u.Profile)
@@ -86,15 +83,6 @@ func runAuction(campaigns map[string]float64) string {
 	// If determined more than one winner with max price
 	// randomly choose one
 	return maxBidders[rand.Intn(n)]
-}
-
-// Increments count of tries of bid processing
-func incrementCounter() int {
-	counter.Lock()
-	defer counter.Unlock()
-
-	counter.n++
-	return counter.n
 }
 
 // Validates campaign attributes
