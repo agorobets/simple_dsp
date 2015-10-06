@@ -59,7 +59,7 @@ func GetData() *dataStruct {
 }
 
 // Determines the winner of auction by max price and returns its name
-func runAuction(campaigns []*campaign.Campaign) string {
+func runAuction(campaigns []*Campaign) string {
 	var maxBid float64
 	var maxBidders []string
 
