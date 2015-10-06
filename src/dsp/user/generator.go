@@ -2,42 +2,24 @@ package user
 
 import (
 	"math/rand"
+	"runtime"
 	"strconv"
 	"sync/atomic"
 	"time"
 )
 
 const (
-	MAX_USER_PROFILE_COUNTER   = 26
-	MAX_ATTRIBUTE_VALUE        = 200
-	RANDOM_GENERATOR_CHAN_SIZE = 2
-	USER_GENERATOR_CHAN_SIZE   = 2
+	MAX_USER_PROFILE_COUNTER = 26
+	MAX_ATTRIBUTE_VALUE      = 200
 )
 
-var userGlobalCounter uint64
-var userProfileGlobalCounter uint64
-
+var counter uint64
 var rndChan chan int
 
-// Initialize user generator
-func InitGenerator() chan *User {
-	initRandomGenerator()
-
-	userChan := make(chan *User, USER_GENERATOR_CHAN_SIZE)
-	for i := 0; i < USER_GENERATOR_CHAN_SIZE; i++ {
-		go func() {
-			for {
-				userChan <- generate()
-			}
-		}()
-	}
-	return userChan
-}
-
 // Creates goroutine with random generator
-func initRandomGenerator() {
-	rndChan = make(chan int, RANDOM_GENERATOR_CHAN_SIZE*USER_GENERATOR_CHAN_SIZE)
-	for i := 0; i < RANDOM_GENERATOR_CHAN_SIZE*USER_GENERATOR_CHAN_SIZE; i++ {
+func InitRandomGenerator() {
+	rndChan = make(chan int, runtime.NumCPU())
+	for i := 0; i < runtime.NumCPU(); i++ {
 		go func() {
 			source := rand.NewSource(time.Now().UnixNano())
 			rnd := rand.New(source)
@@ -49,23 +31,22 @@ func initRandomGenerator() {
 }
 
 // Generates user with filled attributes
-func generate() *User {
+func Generate() *User {
+	id := int(atomic.AddUint64(&counter, 1))
 	return &User{
-		ID:      "u" + strconv.Itoa(int(atomic.AddUint64(&userGlobalCounter, 1))),
-		Profile: generateProfile(),
+		ID:      "u" + strconv.Itoa(id),
+		Profile: generateProfile(id % MAX_USER_PROFILE_COUNTER),
 	}
 }
 
-// Generates user profile with userProfileCounter attributes
-func generateProfile() map[string]string {
-	userProfileCounter := int(atomic.AddUint64(&userProfileGlobalCounter, 1))
-	if userProfileGlobalCounter > MAX_USER_PROFILE_COUNTER {
-		userProfileCounter = 1
-		atomic.StoreUint64(&userProfileGlobalCounter, 1)
+// Generates user profile
+func generateProfile(length int) map[string]string {
+	if length == 0 {
+		length = MAX_USER_PROFILE_COUNTER
 	}
 
-	profile := make(map[string]string, userProfileCounter)
-	for i := 0; i < userProfileCounter; i++ {
+	profile := make(map[string]string, length)
+	for i := 0; i < length; i++ {
 		character := string(i + 'A')
 		profile["attr_"+character] = character + strconv.Itoa(<-rndChan)
 	}

@@ -4,10 +4,9 @@ import (
 	"dsp/bidding"
 	"dsp/campaign"
 	"dsp/user"
+	"encoding/json"
 	"fmt"
 	"net/http"
-	// _ "net/http/pprof"
-	"encoding/json"
 	"runtime"
 	"strconv"
 )
@@ -21,13 +20,13 @@ const (
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	userChan := user.InitGenerator()
+	user.InitRandomGenerator()
 
 	http.HandleFunc("/campaign", GetCampaigns)
-	http.HandleFunc("/user", GetUser(userChan))
+	http.HandleFunc("/user", GetUser)
 	http.HandleFunc("/import_camp", ImportCampaigns)
 	http.HandleFunc("/search", Search)
-	http.HandleFunc("/search_auto", SearchAuto(userChan))
+	http.HandleFunc("/search_auto", SearchAuto)
 	http.HandleFunc("/dump", DumpData)
 
 	http.ListenAndServe(":3000", nil)
@@ -76,14 +75,12 @@ func GetCampaigns(w http.ResponseWriter, req *http.Request) {
 // Generates randomly filled User JSON object
 // Responses:
 //   200 OK - return JSON object of user
-func GetUser(userChan chan *user.User) http.HandlerFunc {
-	return func(w http.ResponseWriter, req *http.Request) {
-		if req.Method != "GET" {
-			sendString(w, http.StatusNotFound, "Not Found")
-			return
-		}
-		sendJson(w, http.StatusOK, <-userChan)
+func GetUser(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "GET" {
+		sendString(w, http.StatusNotFound, "Not Found")
+		return
 	}
+	sendJson(w, http.StatusOK, user.Generate())
 }
 
 // Imports campaigns and updates bidding.data struct
@@ -137,14 +134,12 @@ func Search(w http.ResponseWriter, req *http.Request) {
 // Responses:
 //    200 OK - return winner struct as Json object
 //    400 Bad Request - return error string
-func SearchAuto(userChan chan *user.User) http.HandlerFunc {
-	return func(w http.ResponseWriter, req *http.Request) {
-		if req.Method != "GET" {
-			sendString(w, http.StatusNotFound, "Not Found")
-			return
-		}
-		sendJson(w, http.StatusOK, bidding.ProcessBid(<-userChan))
+func SearchAuto(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "GET" {
+		sendString(w, http.StatusNotFound, "Not Found")
+		return
 	}
+	sendJson(w, http.StatusOK, bidding.ProcessBid(user.Generate()))
 }
 
 // Returns dump of bidding.data object as JSON
